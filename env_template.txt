@@ -1,0 +1,11 @@
+# Google Sheets Configuration
+GOOGLE_SHEETS_URL=https://docs.google.com/spreadsheets/d/1lHmRpCHV1gVSFf4RCNhmKDUPIL-JMAQMeeR3l6WXuj4/edit?gid=0#gid=0
+
+# OpenAI Configuration (optional)
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4o-mini
+
+# Whisper Configuration
+WHISPER_MODEL=small
+WHISPER_DEVICE=cpu
+WHISPER_COMPUTE=int8
