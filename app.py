@@ -231,10 +231,11 @@ def parse_amount_eur(token: str) -> Optional[float]:
 
 def parse_slash(raw: str):
     """
-    strictly: when / where / amount / memo
+    strictly: when / where / amount [memo]
     ex) today / supermarket / 35 euro / lunch
         08.07.2025 / coffee wackers / 5 euro / morning coffee
         this month / gas station / 45 euro / fuel
+        today / cafe / 5 euro  (memo is optional)
 
     The STT can mishear separators. We normalize common variants like
     spoken "slash", commas, or Korean "슬래시" into '/'.
@@ -255,14 +256,23 @@ def parse_slash(raw: str):
     t = re.sub(r"\s+", " ", t).strip()
 
     parts = [p.strip() for p in t.split("/") if p.strip()]
-    # Fallback: exactly four space-separated tokens with 3rd token numeric → when where amount memo
+    # Fallback: exactly three or four space-separated tokens with 3rd token numeric → when where amount [memo]
     if len(parts) == 1 and "/" not in t:
         space_tokens = t.split()
-        if len(space_tokens) == 4 and re.fullmatch(r"-?\d+(?:[.,]\d+)?(?:\s*(?:euro|eur))?", space_tokens[2]):
+        if len(space_tokens) == 3 and re.fullmatch(r"-?\d+(?:[.,]\d+)?(?:\s*(?:euro|eur))?", space_tokens[2]):
+            parts = [space_tokens[0], space_tokens[1], space_tokens[2], ""]  # empty memo
+        elif len(space_tokens) == 4 and re.fullmatch(r"-?\d+(?:[.,]\d+)?(?:\s*(?:euro|eur))?", space_tokens[2]):
             parts = [space_tokens[0], space_tokens[1], space_tokens[2], space_tokens[3]]
-    if len(parts) != 4:
-        raise ValueError("Use 4 parts: when / where / amount / memo")
-    when_tok, where, amount_tok, memo = parts
+    
+    if len(parts) == 3:
+        # 3 parts: when / where / amount (memo is optional)
+        when_tok, where, amount_tok = parts
+        memo = ""
+    elif len(parts) == 4:
+        # 4 parts: when / where / amount / memo
+        when_tok, where, amount_tok, memo = parts
+    else:
+        raise ValueError("Use 3-4 parts: when / where / amount [memo] (memo is optional)")
     when_iso = normalize_date(when_tok)
     if not when_iso:
         raise ValueError(f"Invalid date: '{when_tok}'")
@@ -335,8 +345,30 @@ def llm_extract_fields(text: str) -> Optional[tuple]:
 
 # ================= streamlit ui =================
 st.set_page_config(page_title="Allowance Ingest (EUR)", page_icon="💶", layout="centered")
+
+# ================= authentication =================
+def check_authentication():
+    """Simple password authentication"""
+    if st.session_state.get("authenticated") != True:
+        st.title("🔐 Access Required")
+        st.write("Please enter the password to access the app.")
+        
+        password = st.text_input("Password", type="password", key="password_input")
+        if st.button("Login"):
+            # Set your password here
+            correct_password = os.getenv("APP_PASSWORD", "allowance2025")
+            if password == correct_password:
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("❌ Incorrect password. Please try again.")
+        st.stop()
+
+# Check authentication
+check_authentication()
+
 st.title("💶 Allowance Ingest (EUR) — Test App")
-st.caption("Type or speak the command in **slash format**: `when / where / amount / memo` (Euro only).")
+st.caption("Type or speak the command in **slash format**: `when / where / amount [memo]` (memo is optional, Euro only).")
 
 # ================= budget status display =================
 remaining, percentage, budget = get_budget_status()
@@ -367,7 +399,7 @@ with st.expander("Text input", expanded=True):
             st.error(str(e))
 
 with st.expander("🎤 Real-time Recording", expanded=True):
-    st.write("**Record directly from your microphone** - say it in slash format (e.g., 'today / supermarket / 35 euro / lunch').")
+    st.write("**Record directly from your microphone** - say it in slash format (e.g., 'today / supermarket / 35 euro / lunch' or 'today / cafe / 5 euro').")
     
     # Real-time recording
     audio_data = st.audio_input("Record your voice")
@@ -404,7 +436,7 @@ with st.expander("🎤 Real-time Recording", expanded=True):
                 pass
 
 with st.expander("📁 Audio File Upload"):
-    st.write("Upload a pre-recorded audio file where you **say it in slash format** (e.g., 'today / supermarket / 35 euro / lunch').")
+    st.write("Upload a pre-recorded audio file where you **say it in slash format** (e.g., 'today / supermarket / 35 euro / lunch' or 'today / cafe / 5 euro').")
     audio = st.file_uploader("Audio file", type=["wav", "mp3", "m4a", "ogg"])
     lang = st.selectbox("Language", ["en"], index=0)
     show_text = st.checkbox("Show transcribed text", value=True)
@@ -572,3 +604,8 @@ with st.expander("🧠 LLM Parser (optional)", expanded=False):
         st.warning("Set environment variable OPENAI_API_KEY to use this feature.")
 
 st.caption("Data is saved to Google Sheets (if configured) or local allowance.xlsx file (columns: when | where | amount | memo).")
+
+# Logout button
+if st.button("🚪 Logout"):
+    st.session_state["authenticated"] = False
+    st.rerun()

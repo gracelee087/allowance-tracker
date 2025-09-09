@@ -1,6 +1,9 @@
 # Google Sheets Configuration
 GOOGLE_SHEETS_URL=https://docs.google.com/spreadsheets/d/1lHmRpCHV1gVSFf4RCNhmKDUPIL-JMAQMeeR3l6WXuj4/edit?gid=0#gid=0
 
+# App Security
+APP_PASSWORD=allowance2025
+
 # OpenAI Configuration (optional)
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4o-mini
